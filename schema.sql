@@ -1,0 +1,49 @@
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout=30000;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen TEXT,
+  state TEXT NOT NULL DEFAULT 'pending',
+  consent_at TEXT,
+  grant_hash TEXT,
+  best_lat REAL,
+  best_lon REAL,
+  best_acc REAL,
+  best_at TEXT,
+  hits INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS hits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL REFERENCES sessions(token) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  acc REAL NOT NULL,
+  quality INTEGER NOT NULL,
+  ts TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL REFERENCES sessions(token) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  body TEXT,
+  ts TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS zones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  radius REAL NOT NULL DEFAULT 300
+);
+CREATE TABLE IF NOT EXISTS zone_state (
+  token TEXT NOT NULL REFERENCES sessions(token) ON DELETE CASCADE,
+  zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+  inside INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(token, zone_id)
+);
+CREATE INDEX IF NOT EXISTS ix_hits_token ON hits(token, id);
+CREATE INDEX IF NOT EXISTS ix_events_token ON events(token, id);

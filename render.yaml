@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: geoharvest-consent
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 -k gthread --threads 12 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: ADMIN_PASS
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: BASE_URL
+        sync: false
+      - key: START_BOT
+        value: '1'
+      - key: DB_PATH
+        value: data.sqlite3
