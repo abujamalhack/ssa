@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020">
+<title>مشاركة الموقع بالموافقة</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--card:#141d31;--line:#2b3953;--text:#e8f0fa;--muted:#a6b6ca;--primary:#387ce8;--ok:#42c985;--bad:#ff7c7c}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(900px 400px at 50% 0,#172e4b,var(--bg));font:15px/1.9 system-ui,"Segoe UI",sans-serif;color:var(--text)}
+.card{width:100%;max-width:520px;border:1px solid var(--line);background:var(--card);padding:28px;border-radius:20px;box-shadow:0 20px 60px #0006}
+h1{font-size:24px;margin:0 0 12px}p{margin:8px 0 14px;color:var(--muted)}.note{padding:13px 16px;background:#101b30;border:1px solid var(--line);border-radius:12px;font-size:14px}.note strong{color:var(--text)}
+.actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}button{flex:1;min-width:150px;border:0;border-radius:11px;padding:12px 15px;background:var(--primary);font:inherit;font-weight:700;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}button.stop{background:#722f42}
+.status{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;color:var(--muted)}.active{color:var(--ok)}.error{color:var(--bad)}.small{font-size:12px;margin-top:13px}a{color:#8fc6ff}
+</style>
+</head>
+<body><main class="card">
+<h1>🛰 مشاركة الموقع بموافقتك</h1>
+{% if not token %}
+<p>هذه الصفحة مخصّصة لمشاركة الموقع الجغرافي بشكل اختياري وشفاف.</p>
+<p>يجب فتح رابط مشاركة صالح أنشأه مسؤول النظام. <a href="/admin">لوحة الإدارة</a></p>
+{% elif closed %}
+<p class="error">رابط المشاركة هذا مغلق. تواصل مع الشخص الذي أرسل إليك الرابط.</p>
+{% else %}
+<p>أرسل إليك مسؤول هذه الخدمة رابطًا يتيح لك <strong>مشاركة موقعك الجغرافي الدقيق</strong> بإرادتك.</p>
+<div class="note"><strong>قبل البدء:</strong> عند الضغط على «أوافق وأبدأ المشاركة»، سيطلب المتصفح إذن الوصول إلى الموقع. عند السماح، تُرسل نقاط موقعك إلى خادم الخدمة، ويمكن لمسؤولها رؤيتها في لوحة الإدارة واستلام تنبيهات عبر تيليجرام. قد تُحفظ النقاط للمراجعة والتصدير. لا يُطلب الوصول إلى الصور أو جهات الاتصال أو الحافظة.</div>
+<p>المشاركة اختيارية. يمكنك إيقافها في أي لحظة بالزر أدناه، وتتوقف أيضًا عند إخفاء الصفحة أو مغادرتها. لا يُعاد تشغيلها تلقائيًا.</p>
+<div class="actions"><button id="start">أوافق وأبدأ مشاركة موقعي</button><button class="stop" id="stop" disabled>إيقاف المشاركة</button></div>
+<div id="status" class="status" role="status" aria-live="polite">الحالة: لا توجد مشاركة نشطة.</div>
+<p class="small">دقة بيانات GPS تختلف بحسب الجهاز والبيئة. المتصفح يطلب موافقتك بشكل منفصل.</p>
+{% endif %}
+</main>
+{% if token and not closed %}
+<script>
+(() => {
+  'use strict';
+  const TOKEN = {{ token|tojson }};
+  const startButton = document.getElementById('start');
+  const stopButton = document.getElementById('stop');
+  const statusBox = document.getElementById('status');
+  let grant = null, watch = null, stopInProgress = false;
+  function status(message, cls='') {statusBox.textContent = message; statusBox.className = 'status '+cls;}
+  async function post(path, data, keepalive=false) {
+    const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data), credentials:'same-origin', keepalive});
+    if (!response.ok) throw new Error('HTTP '+response.status);
+    return response.json();
+  }
+  async function stop(silent=false) {
+    if (stopInProgress || !grant) return;
+    stopInProgress = true;
+    const oldGrant = grant; grant = null;
+    if (watch !== null) {navigator.geolocation.clearWatch(watch);watch=null;}
+    startButton.disabled = false;stopButton.disabled = true;
+    status('تم إيقاف مشاركة الموقع.', '');
+    try {await post('/api/consent/stop', {token:TOKEN,grant:oldGrant}, true);}
+    catch(e) {if(!silent) status('توقف جهازك عن إرسال الموقع؛ تحقق من الاتصال للتأكد من وصول طلب الإيقاف.', 'error');}
+    stopInProgress = false;
+  }
+  async function start() {
+    if (!navigator.geolocation) {status('المتصفح لا يدعم تحديد الموقع.', 'error'); return;}
+    startButton.disabled = true;
+    status('يجري بدء المشاركة وطلب إذن الموقع…');
+    try {
+      const result = await post('/api/consent/start',{token:TOKEN});
+      grant = result.grant;
+      stopButton.disabled = false;
+      watch = navigator.geolocation.watchPosition(async position => {
+        if (!grant || document.hidden) return;
+        const {latitude:lat,longitude:lon,accuracy:acc}=position.coords;
+        status(`المشاركة نشطة: ${lat.toFixed(6)}, ${lon.toFixed(6)} — الدقة التقريبية ±${Math.round(acc)} متر`,'active');
+        try {await post('/api/hit',{token:TOKEN,grant,lat,lon,acc});}
+        catch(e){status('المشاركة نشطة على جهازك لكن فشل إرسال نقطة إلى الخادم.','error');}
+      }, error => {
+        const reason = error.code===1?'تم رفض إذن الموقع':error.code===2?'موقع الجهاز غير متاح':'انتهت مهلة GPS';
+        status(reason, 'error');
+        if(error.code===1) stop();
+      },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+    } catch(e) {startButton.disabled=false;stopButton.disabled=true;status('تعذر بدء الجلسة، تحقق من الرابط والخادم.', 'error');}
+  }
+  startButton.addEventListener('click',start);
+  stopButton.addEventListener('click',()=>stop());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop(true);});
+  window.addEventListener('pagehide',()=>{
+    if(!grant)return;
+    const payload=JSON.stringify({token:TOKEN,grant});
+    navigator.sendBeacon('/api/consent/stop',new Blob([payload],{type:'application/json'}));
+    if(watch!==null)navigator.geolocation.clearWatch(watch);
+    grant=null;
+  });
+})();
+</script>
+{% endif %}
+</body></html>

@@ -1,0 +1,16 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة الإدارة · GEOHARVEST</title><style>
+body{margin:0;background:#0b1020;color:#e7f0fc;font:14px/1.8 system-ui}.wrap{max-width:1280px;margin:auto;padding:22px}header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}h1{font-size:22px}h2{font-size:16px;margin-top:30px}button{border:0;background:#347ce9;color:white;border-radius:8px;padding:8px 13px;cursor:pointer;font:inherit}input{background:#17253d;color:white;border:1px solid #355174;padding:9px;border-radius:8px;font:inherit}table{border-collapse:collapse;width:100%;min-width:780px}th,td{border-bottom:1px solid #253650;text-align:right;padding:10px}th{color:#98adc9}a{color:#92c6ff}.panel{overflow-x:auto;background:#121e32;border:1px solid #263a55;border-radius:12px}.inline{display:inline}.danger{background:#7d3046}.status{color:#72dca7}.small{font-size:12px;color:#9eb0c9;word-break:break-all}
+</style></head><body><div class="wrap"><header><h1>🛰 GEOHARVEST · إدارة المشاركات الطوعية</h1><form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button>تسجيل الخروج</button></form></header>
+<p>الموقع لا يُجمع إلا بعد موافقة صريحة من الزائر. يمكن للمسؤول إغلاق الجلسات وحذف بياناتها.</p>
+<h2>إنشاء جلسة جديدة</h2><form method="post" action="/admin/new"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="label" maxlength="80" placeholder="اسم الجلسة" required><button type="submit">إنشاء الرابط</button></form>
+<h2>الجلسات ({{ sessions|length }})</h2><div class="panel"><table><thead><tr><th>الاسم</th><th>الحالة</th><th>النقاط</th><th>أفضل دقة</th><th>الرابط</th><th>الإدارة</th></tr></thead><tbody>
+{% for s in sessions %}<tr><td>{{ s.label }}<div class="small">{{ s.token }}</div></td><td class="status">{{ s.state }}</td><td>{{ s.hits }}</td><td>{{ s.best_acc|round|int if s.best_acc else '—' }} متر</td>
+<td><a href="/t/{{ s.token }}" target="_blank" rel="noopener">مشاركة</a> · <a href="/l/{{ s.token }}" target="_blank" rel="noopener">دعوة</a></td>
+<td><a href="/admin/s/{{ s.token }}">مباشر</a> · <a href="/admin/export/{{ s.token }}/csv">CSV</a> · <a href="/admin/export/{{ s.token }}/geojson">GeoJSON</a>
+<form class="inline" action="/admin/close/{{ s.token }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger" type="submit">إغلاق</button></form>
+<form class="inline" action="/admin/wipe/{{ s.token }}" method="post" onsubmit="return confirm('هل تريد حذف جميع بيانات هذه الجلسة نهائياً؟')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger" type="submit">حذف</button></form>
+</td></tr>{% else %}<tr><td colspan="6">لا توجد جلسات بعد.</td></tr>{% endfor %}
+</tbody></table></div>
+<h2>آخر الأحداث</h2><div class="panel"><table><thead><tr><th>التوقيت (UTC)</th><th>الجلسة</th><th>الحدث</th><th>البيانات</th></tr></thead><tbody>{% for e in events %}<tr><td>{{ e.ts }}</td><td>{{ e.token }}</td><td>{{ e.kind }}</td><td>{{ e.body or '—' }}</td></tr>{% else %}<tr><td colspan="4">لا توجد أحداث.</td></tr>{% endfor %}</tbody></table></div>
+</div></body></html>
